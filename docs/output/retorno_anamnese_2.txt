@@ -1,0 +1,27 @@
+tema_documento: Anamnese médica do paciente
+responsavel_coleta: Não informado
+id_paciente: Maria Luiza Ramos, 52 anos, feminina, parda, natural de Dourados - MS, procedente de Campo Grande - MS
+nasceu_apos_2000: False
+sexo_masculino: False
+reside_em_campo_grande_ms: True
+escolaridade_ate_ensino_medio: False
+autodeclarado_pardo_ou_preto: True
+casado_ou_uniao_estavel: True
+possui_ocupacao_remunerada: False
+tabagista: False
+consome_alcool_regularmente: False
+utilizou_drogas_ilicitas: False
+pratica_atividade_fisica: False
+comorbidades_previas: True
+uso_medicamentos_pre_ei: True
+uso_fitoterapicos_pre_ei: False
+procedimento_odontologico_pre_ei: True
+complicacoes_odontologicas: True
+endocardite_previa: False
+valvula_protetica_ou_marcapasso: False
+cirurgia_cardiaca_previa: True
+febre: True
+sopros_cardiacos: True
+manifestacoes_cutaneas: True
+insuficiencia_cardiaca: True
+eventos_embolicos: False

@@ -1,0 +1,37 @@
+filename: None
+content: Legenda:
+
+QP: Queixa principal
+HDA: Historia da Doença Atual
+HMP: Historia Morbida pregressa
+HFS: Hábitos de Vida e História Social
+HFAM: Historico Familiar
+Beg = Bom estado geral
+Reg = regular estado geral
+tema_documento: Legenda para avaliação clínica
+responsavel_coleta: Não informado
+id_paciente: Não informado
+nasceu_apos_2000: None
+sexo_masculino: None
+reside_em_campo_grande_ms: None
+escolaridade_ate_ensino_medio: None
+autodeclarado_pardo_ou_preto: None
+casado_ou_uniao_estavel: None
+possui_ocupacao_remunerada: None
+tabagista: None
+consome_alcool_regularmente: None
+utilizou_drogas_ilicitas: None
+pratica_atividade_fisica: None
+comorbidades_previas: None
+uso_medicamentos_pre_ei: None
+uso_fitoterapicos_pre_ei: None
+procedimento_odontologico_pre_ei: None
+complicacoes_odontologicas: None
+endocardite_previa: None
+valvula_protetica_ou_marcapasso: None
+cirurgia_cardiaca_previa: None
+febre: None
+sopros_cardiacos: None
+manifestacoes_cutaneas: None
+insuficiencia_cardiaca: None
+eventos_embolicos: None
