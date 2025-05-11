@@ -1,0 +1,27 @@
+tema_documento: Anamnese paciente com febre e lesoes cutaneas
+responsavel_coleta: nao informado
+id_paciente: Rafael Santana Costa, 28 anos, masculino, solteiro, pardo, natural e procedente de Salvador - BA, tatuador, sem religiao definida
+nasceu_apos_2000: nao
+sexo_masculino: sim
+reside_em_campo_grande_ms: nao informado
+escolaridade_ate_ensino_medio: nao informado
+autodeclarado_pardo_ou_preto: sim
+casado_ou_uniao_estavel: nao
+possui_ocupacao_remunerada: sim
+tabagista: sim
+consome_alcool_regularmente: nao informado
+utilizou_drogas_ilicitas: nao
+pratica_atividade_fisica: nao informado
+comorbidades_previas: nao
+uso_medicamentos_pre_ei: nao
+uso_fitoterapicos_pre_ei: nao informado
+procedimento_odontologico_pre_ei: nao informado
+complicacoes_odontologicas: nao informado
+endocardite_previa: nao informado
+valvula_protetica_ou_marcapasso: nao informado
+cirurgia_cardiaca_previa: nao informado
+febre: sim
+sopros_cardiacos: sim
+manifestacoes_cutaneas: sim
+insuficiencia_cardiaca: nao informado
+eventos_embolicos: nao informado

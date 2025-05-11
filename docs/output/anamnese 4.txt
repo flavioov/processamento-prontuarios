@@ -1,0 +1,27 @@
+tema_documento: Anamnese detalhada de paciente com febre e dispneia
+responsavel_coleta: nao informado
+id_paciente: Cláudio Menezes da Silva, 63 anos, masculino, branco, natural de Belo Horizonte - MG, procedente de Campo Grande - MS, contador aposentado, católico
+nasceu_apos_2000: nao
+sexo_masculino: sim
+reside_em_campo_grande_ms: sim
+escolaridade_ate_ensino_medio: nao informado
+autodeclarado_pardo_ou_preto: nao
+casado_ou_uniao_estavel: sim
+possui_ocupacao_remunerada: nao
+tabagista: nao
+consome_alcool_regularmente: nao
+utilizou_drogas_ilicitas: nao
+pratica_atividade_fisica: nao
+comorbidades_previas: sim
+uso_medicamentos_pre_ei: sim
+uso_fitoterapicos_pre_ei: nao informado
+procedimento_odontologico_pre_ei: sim
+complicacoes_odontologicas: nao informado
+endocardite_previa: nao informado
+valvula_protetica_ou_marcapasso: nao informado
+cirurgia_cardiaca_previa: nao informado
+febre: sim
+sopros_cardiacos: sim
+manifestacoes_cutaneas: sim
+insuficiencia_cardiaca: nao informado
+eventos_embolicos: nao informado
