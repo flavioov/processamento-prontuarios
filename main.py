@@ -1,9 +1,14 @@
 import os
 import getpass
 import pathlib
+import time
+
+from pathlib import Path
+
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
 from langchain_openai import ChatOpenAI
-from langchain_community.document_loaders import word_document
 from langgraph.checkpoint.memory import MemorySaver
 
 from langgraph.graph import StateGraph
@@ -16,7 +21,7 @@ from pydantic import BaseModel, Field
 
 from typing_extensions import Optional, Annotated
 
-from datetime import date, time
+from datetime import date
 
 
 def _set_env(var: str):
@@ -27,16 +32,16 @@ class Documents(BaseModel):
     documents: Optional[list[dict[str, str]]] = Field(..., description="Lista de documentos carregados do S.O.")
 
 class InstrumentoColetaDados(BaseModel):
-    filename: Optional[str] = Field(None, description="Nome do documento")
-    content: Optional[str] = Field(None, description="Conteúdo do documento")
+    content: Optional[str] = Field(str, description="Conteúdo do documento")
     tema_documento: Optional[str] = Field(
         None,
-        description="Resposta concisa com máximo de 50 caraceteres retornando o tema do documento",
+        description="Resposta concisa com máximo de 50 caraceteres retornando o tema e assunto do documento.",
     )
     # # Informações do projeto
     responsavel_coleta: Optional[str] = Field(
         None,
-        description="Resposta concisa com máximo de 50 do nome da pessoa responsável pela coleta. Se não encontrar, retorne 'Não informado'.",
+        description="Resposta concisa com máximo de 50 do nome da pessoa responsável pela coleta.Retorna o nome do"
+                    "responsável pela coleta, se não encontrar, retorne Não informado.",
     )
     # data_coleta: Optional[date]
     # horario_coleta: Optional[time]
@@ -44,208 +49,241 @@ class InstrumentoColetaDados(BaseModel):
         None,
         description="Resposta concisa do Id do paciente. O Id é toda qualificação "
         "do paciente. Costuma ser toda informação após 'id:' ou todo "
-        "e qualquer detalhe ou característica sobre o paciente. Se "
-        "não encontrar, retorne 'Não informado'.",
+        "e qualquer detalhe ou característica sobre o paciente. Retorna todas as caracteristicas do paciente, se não encontrar, "
+        "retorne Não informado.",
     )
     #
     # # 1. Dados demográficos e socioeconômicos
-    nasceu_apos_2000: Optional[bool] = Field(
+    nasceu_apos_2000: Optional[str] = Field(
         None,
-        description="Resposta do tipo boolean se o paciente nasceu após o ano"
-        " de 2000 ou não. Se não encontrar, retorne "
-        "'Não informado'.",
+        description="Resposta do tipo str se o paciente nasceu após o ano"
+        " de 2000 ou não. Retorna sim ou não, se não encontrar, "
+        "retorne Não informado.",
     )
-    sexo_masculino: Optional[bool] = Field(
+    sexo_masculino: Optional[str] = Field(
         None,
-        description="Resposta do tipo boolean se o paciente é do sexo masculino"
-        " ou não. Se não encontrar, retorne 'Não informado'.",
+        description="Resposta do tipo str se o paciente é do sexo masculino"
+        " ou não.Retorna sim ou não, se não encontrar, "
+        "retorne Não informado.",
     )
-    reside_em_campo_grande_ms: Optional[bool] = Field(
+    reside_em_campo_grande_ms: Optional[str] = Field(
         None,
-        description="Resposta do tipo boolean se o paciente reside "
-        "em campo grande ou não. Se não encontrar, "
-        "retorne 'Não informado'.",
+        description="Resposta do tipo str se o paciente reside "
+        "em campo grande ou não. Retorna sim ou não, se não encontrar, "
+        "retorne Não informado.",
     )
-    escolaridade_ate_ensino_medio: Optional[bool] = Field(
+    escolaridade_ate_ensino_medio: Optional[str] = Field(
         None,
-        description="Resposta do tipo boolean se o paciente "
+        description="Resposta do tipo str se o paciente "
         "possui escolaridade até ensino médio ou "
-        "não. Se não encontrar, retorne "
-        "'Não informado'.",
+        "não. Retorna sim ou não, se não encontrar, "
+        "retorne Não informado.",
     )
-    autodeclarado_pardo_ou_preto: Optional[bool] = Field(
+    autodeclarado_pardo_ou_preto: Optional[str] = Field(
         None,
-        description="Resposta do tipo boolean se o paciente "
+        description="Resposta do tipo str se o paciente "
         "foi declarado pardo ou preto ou não. "
-        "Se não encontrar, retorne 'Não informado'.",
+        "Retorna sim ou não, se não encontrar, "
+        "retorne Não informado.",
     )
-    casado_ou_uniao_estavel: Optional[bool] = Field(
+    casado_ou_uniao_estavel: Optional[str] = Field(
         None,
-        description="Resposta do tipo boolean se o paciente é casado"
-        ", possui união estável ou não. Caso contrário"
-        "a resposta é 'Não informado'",
+        description="Resposta do tipo str se o paciente é casado"
+        ", possui união estável ou não. Retorna sim ou não, se não encontrar, "
+        "retorne Não informado.",
     )
-    possui_ocupacao_remunerada: Optional[bool] = Field(
+    possui_ocupacao_remunerada: Optional[str] = Field(
         None,
-        description="Resposta do tipo boolean se o paciente "
-        "possui ocupação remunerada ou não. Se não "
-        "encontrar, retorne 'Não informado'.",
+        description="Resposta do tipo str se o paciente "
+        "possui ocupação remunerada ou não. Retorna sim ou não, se não encontrar, "
+        "retorne Não informado.",
     )
     #
     # # 2. Hábitos de vida
-    tabagista: Optional[bool] = Field(
+    tabagista: Optional[str] = Field(
         None,
-        description="Resposta do tipo boolean se o paciente é tabagista ou não. "
-        "Se não encontrar, retorne 'Não informado'.",
+        description="Resposta do tipo str se o paciente é tabagista ou não. "
+        "Retorna sim ou não, se não encontrar, "
+        "retorne Não informado.",
     )
-    consome_alcool_regularmente: Optional[bool] = Field(
+    consome_alcool_regularmente: Optional[str] = Field(
         None,
-        description="Resposta do tipo boolean se o paciente "
-        "consome bebida alcoolica regularmente ou não. ",
+        description="Resposta do tipo str se o paciente "
+        "consome bebida alcoolica regularmente ou não. Retorna sim ou não, se não encontrar, "
+        "retorne Não informado.",
     )
-    utilizou_drogas_ilicitas: Optional[bool] = Field(
+    utilizou_drogas_ilicitas: Optional[str] = Field(
         None,
-        description="Resposta do tipo boolean se o paciente "
-        "utiliza drogas ilícitas ou não. Se não "
-        "encontrar, retorne 'Não informado'.",
+        description="Resposta do tipo str se o paciente "
+        "utiliza drogas ilícitas ou não. Retorna sim ou não, se não encontrar, "
+        "retorne Não informado..",
     )
-    pratica_atividade_fisica: Optional[bool] = Field(
+    pratica_atividade_fisica: Optional[str] = Field(
         None,
-        description="Resposta do tipo boolean se o paciente pratica atividade física regular ou não. "
-                    "Se não encontrar, retorne 'Não informado'."
-    )
-
-    comorbidades_previas: Optional[bool] = Field(
-        None,
-        description="Resposta do tipo boolean se o paciente possui "
-        "comorbidades prévias ou não. Se não encontrar, retorne "
-        "'Não informado'.",
-    )
-    uso_medicamentos_pre_ei: Optional[bool] = Field(
-        None,
-        description="Resposta do tipo boolean se o paciente faz uso de "
-        "medicamentos pré-EI ou não. Se não encontrar, retorne "
-        "'Não informado'.",
-    )
-    uso_fitoterapicos_pre_ei: Optional[bool] = Field(
-        None,
-        description="Resposta do tipo boolean se o paciente faz uso de "
-        "fitoterápicos pré-EI ou não. Se não encontrar, "
-        "retorne 'Não informado'.",
+        description="Resposta do tipo str se o paciente pratica atividade física regular ou não. "
+                    "Retorna sim ou não, se não encontrar, "
+                    "retorne Não informado."
     )
 
-    procedimento_odontologico_pre_ei: Optional[bool] = Field(
+    comorbidades_previas: Optional[str] = Field(
         None,
-        description="Resposta do tipo boolean se o paciente "
+        description="Resposta do tipo str se o paciente possui "
+        "comorbidades prévias ou não. Retorna sim ou não, se não encontrar, "
+        "retorne Não informado.",
+    )
+    uso_medicamentos_pre_ei: Optional[str] = Field(
+        None,
+        description="Resposta do tipo str se o paciente faz uso de "
+        "medicamentos pré-EI ou não. Retorna sim ou não, se não encontrar, "
+        "retorne Não informado.",
+    )
+    uso_fitoterapicos_pre_ei: Optional[str] = Field(
+        None,
+        description="Resposta do tipo str se o paciente faz uso de "
+        "fitoterápicos pré-EI ou não. Retorna sim ou não, se não encontrar, "
+        "retorne Não informado.",
+    )
+
+    procedimento_odontologico_pre_ei: Optional[str] = Field(
+        None,
+        description="Resposta do tipo str se o paciente "
         "realizou procedimento odontológico pré-EI ou "
-        "não. Se não encontrar, retorne 'Não informado'.",
+        "não.Retorna sim ou não, se não encontrar, "
+        "retorne Não informado.",
     )
-    complicacoes_odontologicas: Optional[bool] = Field(
+    complicacoes_odontologicas: Optional[str] = Field(
         None,
-        description="Resposta do tipo boolean se o paciente teve "
-        "complicações odontológicas ou não. Se não "
-        "encontrar, retorne 'Não informado'.",
+        description="Resposta do tipo str se o paciente teve "
+        "complicações odontológicas ou não. Retorna sim ou não, se não encontrar, "
+        "retorne Não informado.",
     )
-    endocardite_previa: Optional[bool] = Field(
+    endocardite_previa: Optional[str] = Field(
         None,
-        description="Resposta do tipo boolean se o paciente teve endocardite "
-        "prévia ou não. Se não encontrar, retorne 'Não informado'.",
+        description="Resposta do tipo str se o paciente teve endocardite "
+        "prévia ou não.Retorna sim ou não, se não encontrar, "
+        "retorne Não informado.",
     )
-    valvula_protetica_ou_marcapasso: Optional[bool] = Field(
+    valvula_protetica_ou_marcapasso: Optional[str] = Field(
         None,
-        description="Resposta do tipo boolean se o paciente "
+        description="Resposta do tipo str se o paciente "
         "possui válvula protética ou marca-passo ou "
-        "não. Se não encontrar, retorne 'Não informado'.",
+        "não.Retorna sim ou não, se não encontrar, "
+        "retorne Não informado.",
     )
-    cirurgia_cardiaca_previa: Optional[bool] = Field(
+    cirurgia_cardiaca_previa: Optional[str] = Field(
         None,
-        description="Resposta do tipo boolean se o paciente realizou "
-        "cirurgia cardíaca prévia ou não. Se não encontrar, "
-        "retorne 'Não informado'.",
+        description="Resposta do tipo str se o paciente realizou "
+        "cirurgia cardíaca prévia ou não. Retorna sim ou não, se não encontrar, "
+        "retorne Não informado.",
     )
-    febre: Optional[bool] = Field(
+    febre: Optional[str] = Field(
         None,
-        description="Resposta do tipo boolean se o paciente apresenta febre ou não. Se "
-        "não encontrar, retorne 'Não informado'.",
+        description="Resposta do tipo str se o paciente apresenta febre ou não. Retorna sim ou não, se não encontrar, "
+        "retorne Não informado.",
     )
-    sopros_cardiacos: Optional[bool] = Field(
+    sopros_cardiacos: Optional[str] = Field(
         None,
-        description="Resposta do tipo boolean se o paciente apresenta sopros "
-        "cardíacos ou não. Se não encontrar, retorne 'Não informado'.",
+        description="Resposta do tipo str se o paciente apresenta sopros "
+        "cardíacos ou não.Retorna sim ou não, se não encontrar, "
+        "retorne Não informado.",
     )
-    manifestacoes_cutaneas: Optional[bool] = Field(
+    manifestacoes_cutaneas: Optional[str] = Field(
         None,
-        description="Resposta do tipo boolean se o paciente apresenta "
-        "manifestações cutâneas ou não. Se não encontrar, "
-        "retorne 'Não informado'.",
+        description="Resposta do tipo str se o paciente apresenta "
+        "manifestações cutâneas ou não. Retorna sim ou não, se não encontrar, "
+        "retorne Não informado.",
     )
-    insuficiencia_cardiaca: Optional[bool] = Field(
+    insuficiencia_cardiaca: Optional[str] = Field(
         None,
-        description="Resposta do tipo boolean se o paciente apresenta "
-        "insuficiência cardíaca ou não. Se não encontrar, "
-        "retorne 'Não informado'.",
+        description="Resposta do tipo str se o paciente apresenta "
+        "insuficiência cardíaca ou não. Retorna sim ou não, se não encontrar, "
+        "retorne Não informado.",
     )
-    eventos_embolicos: Optional[bool] = Field(
+    eventos_embolicos: Optional[str] = Field(
         None,
-        description="Resposta do tipo boolean se o paciente apresenta eventos "
-        "embólicos ou não. Se não encontrar, retorne 'Não informado'.",
+        description="Resposta do tipo str se o paciente apresenta eventos "
+        "embólicos ou não.Retorna sim ou não, se não encontrar, "
+        "retorne Não informado.",
     )
 
-
-# graph 1
-
-def read_all_docx(state: InstrumentoColetaDados):
-    folder = pathlib.Path("docs/input")
-    docs = []
-
-    for file in folder.glob("*.docx"):
-        print(f"Reading {file}")
-        document = Document(file)
-        text = "\n".join(p.text for p in document.paragraphs)
-        docs.append({
-            "filename": file.name,
-            "content": text
-        })
-        print(text)
-
-    for doc in state.documents:
-        Command(
-            update={
-                "content": doc["content"],
-                "filename": doc["filename"]
-            },
-            goto="processor"
-        )
-
-
-# graph 2
-def extrai_dados(state: InstrumentoColetaDados):
+def extrai_dados(state: InstrumentoColetaDados) -> InstrumentoColetaDados:
     prompt = (
-        f"hoje é: {date.today()}. Você é um médico assistente. Com base no documento a seguir extraia as "
+        f"hoje é: {date.today()}. Você é um médico assistente. Normalize os caracteres para utf-8. Com base no documento a seguir extraia as "
         f"informações relevantes: {state.content}. Outras informações relevantes: {legenda}"
     )
     response = llm.with_structured_output(InstrumentoColetaDados).invoke(prompt)
-
-    return Command(update=response, goto="writer")
+    # print(f"response: {response}")
+    return response
 
 def write_files(state: InstrumentoColetaDados):
     pathlib.Path("docs/output").mkdir(parents=True, exist_ok=True)
-    with open(f"docs/output/{state.filename}.txt", "w", encoding="utf-8") as f:
+    with open(f"docs/output/{filename}.txt", "w", encoding="utf-8") as f:
         for key, value in state.model_dump().items():
             if key == "content" or key == "filename":
-                pass
+                continue
             f.write(f"{key}: {value}\n")
-    return state
+    print(f"📁 Files written to docs/output/{filename}.txt")
 
 memory = MemorySaver()
 graph_builder = StateGraph(InstrumentoColetaDados)
-graph_builder.add_node("read_the_docs", read_all_docx)
 graph_builder.add_node("processor", extrai_dados)
 graph_builder.add_node("writer", write_files)
 
 graph_builder.set_entry_point("processor")
+graph_builder.add_edge("processor", "writer")
+graph_builder.add_edge("writer", END)
 
 graph = graph_builder.compile()
+
+class NewDocxHandler(FileSystemEventHandler):
+    def on_created(self, event):
+        if not event.is_directory:
+            path = pathlib.Path(event.src_path)
+            print(f"is_valid_docx_file: {is_valid_docx_file(path)}")
+            if not is_valid_docx_file(path):
+                print(f"📄 Novo prontuário detectado: {path.name}")
+                if path.suffix == ".docx":
+                    print(f"New .docx file detected: {path}")
+                    content = load_docx_content(path)
+                    response = graph.invoke({"content": content})
+                    # print(f"response: {response}")
+
+# Load DOCX file content
+def load_docx_content(file_path: Path, retries=5, delay=0.5) -> str:
+    for attempt in range(retries):
+        try:
+            document = Document(file_path)
+            content = "\n".join([para.text for para in document.paragraphs])
+            print(f"📄 Conteúdo do documento carregado: {content}")
+            return content
+        except Exception as e:
+            if attempt < retries - 1:
+                time.sleep(delay)
+                continue
+            else:
+                raise RuntimeError(f"Falha ao abrir {file_path.name} após {retries} tentativas.")
+
+def is_valid_docx_file(file_path: Path) -> bool:
+    # Ignore temporary or lock files
+    filename = file_path.name
+    return (
+        filename.startswith("~$")      # MS Word lock file
+        or filename.startswith(".~lock")  # LibreOffice lock file
+        or file_path.stat().st_size > 0       # avoid empty files
+    )
+
+def watch_folder(folder_path: str):
+    observer = Observer()
+    handler = NewDocxHandler()
+    observer.schedule(handler, folder_path, recursive=False)
+    observer.start()
+    print(f"📁 Watching for new .docx files in: {folder_path}")
+    try:
+        while True:
+            time.sleep(30)
+    except KeyboardInterrupt:
+        observer.stop()
+    observer.join()
 
 if __name__ == "__main__":
     legenda = """
@@ -259,29 +297,41 @@ if __name__ == "__main__":
     Beg = Bom estado geral
     Reg = regular estado geral
     """
-    query = """
-    ANAMNESE 2
-    Id: Maria Luiza Ramos, 52 anos, feminina, casada, parda, natural de Dourados - MS, procedente de Campo Grande - MS, aposentada (ex-professora), católica.
-    QP: “Febre, cansaço e inchaço nas pernas há uma semana”
-    HDA: Paciente procura atendimento na UBS referindo febre intermitente (máximas de 38,7ºC) associada a astenia progressiva e dispneia aos esforços moderados há 7 dias. Relata também edema em membros inferiores, principalmente vespertino, e sensação de palpitação ocasional. Nega dor torácica, tosse ou expectoração. Reforça perda de apetite, sudorese noturna e calafrios. Há cerca de 20 dias realizou extração dentária em consultório sem cobertura antibiótica prévia. Desde então, refere início dos sintomas. Nega hemoptise, náuseas ou vômitos.
-    HMP: Portadora de valvopatia mitral reumática diagnosticada na juventude, em uso irregular de enalapril. Relata uma internação hospitalar há 5 anos por descompensação cardíaca. Nega alergias conhecidas. Não usa fitoterápicos. Esquema vacinal incompleto, sem doses atualizadas para COVID-19 ou Influenza.
-    HFS: Nega etilismo ou tabagismo. Casada, em relação estável, nega ISTs prévias. Mora em casa com saneamento básico adequado. Alimentação irregular. Relata cuidado oral deficiente, com episódios recorrentes de gengivite e cáries. Sem contato com animais doentes ou viagens recentes.
-    HFam: Pai falecido aos 70 anos por IAM. Mãe viva, hipertensa e diabética. Um irmão falecido por AVC aos 59 anos.
-    ________________________________________
+    content = """
+    ANAMNESE 1
+    
+    Id: João Barreto, 39 anos, masculino, solteiro, branco, natural e procedente de São José do Rio Preto - SP, pedreiro, evangélico.
+    
+    QP: “Febre e dor no peito há três dias”
+    
+    HDA: Paciente vem à UPA com sintomas de febre alta (39ºC), calafrios intensos, dispneia aos pequenos esforços e dor em região retroesternal tipo pontada que irradia para membro superior esquerdo, sem fator de melhora, iniciados há 3 dias. Nega tosse, náuseas, vômitos e hemoptise. Nega palpitações, taquicardias e dispneia ao repouso. Refere também mialgia e mal-estar geral. Admitiu uso crônico de cocaína injetável regularmente, última utilização há 15 dias, sem assepsia correta e utilizando a mesma seringa para várias aplicações. 
+    
+    HMP: Afirma HAS, mas sem realizar tratamento. Nega outras comorbidades. Nega internações prévias, cirurgias e procedimentos. Nega alergias, uso de fitoterápicos e hemotransfusões, afirma a vacinação irregular. Tomou apenas uma dose para COVID-19.
+    
+    HFS: Paciente alcoolista, tabagista (30 maços-ano) e usuário de cocaína injetável. Afirma relações sexuais desprotegida com múltiplos parceiros. Mora em casa de alvenaria, região urbana, sem saneamento básico adequado (falta de água encanada). Nega viagens recentes e contato com animais doentes.
+    
+    HFam:: Relata mãe falecida aos 64 anos devido câncer de esôfago. Não possui informações sobre pais. Não possui irmãos.
+    
+    
     Exame Físico Geral e Sinais Vitais:
-    REG, corada, anictérica, sem linfadenomegalias palpáveis. Extremidades quentes, com presença de petéquias subungueais e palmas com lesões eritematosas não dolorosas (lesões de Janeway?). TEC 2s. FC: 104 bpm; FR: 20 irpm; Temp: 38,2ºC; PA: 100/60 mmHg; SpO2: 95% em ar ambiente.
-    ________________________________________
+    REG, LOTE, Acianótico e anictérico, fáceis atípicas, sem circulação colateral, sem alteração de peles e fâneros. Linfonodos não palpáveis. 
+    Presença de nódulos em região distal de mãos (nódulos de Osler?). Lesões em botões rosa em troncos e membros (lesões de Janeway?).
+    TEC < 3s
+    FC: 60 bpm; FR: 16 irpm; TA: 38,5ºC; PA: 90/60 mmHg; O2: 97%
+    
     Exame físico respiratório:
-    Tórax simétrico, expansibilidade preservada, murmúrio vesicular presente bilateralmente, sem ruídos adventícios. Percussão normal, sem alterações.
-    ________________________________________
+    Tórax normal, simétrico. Respiração torácica, expansibilidade normal, sem pontos dolorosos e frêmito toracovocal sem alterações. Percussão timpânica, murmúrio vesicular universalmente audível.
+    
     Exame físico cardiovascular:
-    Bulhas hipofonéticas, ritmo regular em 2T, presença de sopro diastólico em foco mitral, não referido previamente. Sem IJV. Pulso de amplitude reduzida.
-    ________________________________________
+    BNF em 2t, presença de sopro holossistólico em foco mitral. Sem ingurgitamento jugular. 
+    
     Exame físico abdominal:
-    Plano, flácido, indolor à palpação, RHA presentes. Fígado palpável a 2 cm do rebordo costal direito, sugestivo de congestão hepática.
+    Plano, sem cicatrizes, sem dor a toque superficial e profundo, ruídos hidroaéreos presentes. 
     """
 
     _set_env("OPENAI_API_KEY")
     model = "gpt-4.1-mini"
     llm = ChatOpenAI(model=model)
-    events = graph.invoke({})
+    filename = "anamnese_1"
+    # events = graph.invoke({"content": content})
+    watch_folder("docs/input")
