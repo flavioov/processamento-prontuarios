@@ -1,49 +1,54 @@
+import asyncio
 import pathlib
-import time
-
 from pathlib import Path
 
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from docx import Document
 
-from graph import MyGraph
+from graph import LLMGraph
 
 
 class NewDocxHandler(FileSystemEventHandler):
-    def on_created(self, event):
+    async def on_created(self, event):
         if not event.is_directory:
             path = pathlib.Path(event.src_path)
             if not is_valid_docx_file(path):
-                print(f"📄 Novo prontuário detectado: {path.name}")
                 if path.suffix == ".docx":
-                    print(f"📁 New .docx file detected: {path}")
-                    content = load_docx_content(path)
-                    graph = MyGraph(file_name=path.name).get_graph()
-                    graph.invoke({"document_content": content})
+                    print(f"📄 Novo prontuário (.docx) detectado: {path}")
+                    asyncio.create_task(process_docx_file(path))
 
 
-# Load DOCX file content
-def load_docx_content(file_path: Path, retries=5, delay=0.5) -> str:
+async def process_docx_file(file_path: Path):
+    try:
+        content = await load_docx_content(file_path)
+        graph_builder = LLMGraph()
+        graph_builder.set_filename(file_name=file_path.name)
+        graph = graph_builder.get_graph()
+        await graph.ainvoke({"document_content": content})
+    except Exception as e:
+        print(f"❌ Erro ao processar {file_path.name}: {e}")
+
+
+def _read_docx(file_path: Path) -> str:
+    document = Document(file_path)
+    print(f"📄 Conteúdo do documento carregado")
+    return "\n".join([para.text for para in document.paragraphs])
+
+
+async def load_docx_content(file_path: Path, retries=5, delay=0.5) -> str:
     for attempt in range(retries):
         try:
-            document = Document(file_path)
-            content = "\n".join([para.text for para in document.paragraphs])
-            print(f"📄 Conteúdo do documento carregado")
-            return content
+            return await asyncio.to_thread(_read_docx, file_path)
         except Exception as e:
             if attempt < retries - 1:
-                time.sleep(delay)
-                continue
+                await asyncio.sleep(delay)
             else:
-                raise RuntimeError(
-                    f"Falha ao abrir {file_path.name} após {retries} tentativas."
-                )
+                raise RuntimeError(f"Falha ao carregar {file_path.name}") from e
     return ""
 
 
-def is_valid_docx_file(file_path: Path) -> bool:
-    # Ignore temporary or lock files
+async def is_valid_docx_file(file_path: Path) -> bool:
     filename = file_path.name
     return (
         filename.startswith("~$")  # MS Word lock file
@@ -52,29 +57,26 @@ def is_valid_docx_file(file_path: Path) -> bool:
     )
 
 
-def watch_folder(folder_path: str):
+async def watch_folder(folder_path: str):
     folder = Path(folder_path)
-    # ✅ First, process all existing .docx files
+    output_folder = "docs/output"
+
+    tasks = []
     for file in folder.glob("*.docx"):
-        if is_valid_docx_file(file):
+        if await is_valid_docx_file(file):
+            output_name = file.name.removesuffix(".docx") + ".txt"
+            output_path = Path(output_folder + "/" + output_name)
+            if output_path.exists():
+                print(f"⚠️ Output já existe para o arquivo {file.name}, ignorando...")
+                continue
+
             print(f"📂 Processando arquivo pré-existente: {file.name}")
-            content = load_docx_content(file)
-            graph = MyGraph(file_name=file.name).get_graph()
-            graph.invoke({"document_content": content})
+            tasks.append(process_docx_file(file))  # don't await here!
 
-    observer = Observer()
-    handler = NewDocxHandler()
-    observer.schedule(handler, folder_path, recursive=False)
-    observer.start()
-    print(f"📁 Watching for new .docx files in: {folder_path}")
-
-    try:
-        while True:
-            time.sleep(10)
-    except KeyboardInterrupt:
-        observer.stop()
-    observer.join()
+    # Run them concurrently
+    if tasks:
+        await asyncio.gather(*tasks)
 
 
 if __name__ == "__main__":
-    watch_folder("docs/input")
+    asyncio.run(watch_folder("docs/input"))
